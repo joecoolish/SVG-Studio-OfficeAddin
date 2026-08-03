@@ -4,7 +4,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 
 const urlDev = "https://localhost:3000/";
-const urlProd = "https://www.contoso.com/"; // CHANGE THIS to the URL where you deploy the add-in.
+const urlProd = "https://joecoolish.github.io/SVG-Studio-OfficeAddin/";
 
 async function getHttpsOptions() {
   const devCerts = require("office-addin-dev-certs");
@@ -71,11 +71,7 @@ module.exports = async (env, options) => {
             from: "manifest*.xml",
             to: "[name]" + "[ext]",
             transform(content) {
-              if (dev) {
-                return content;
-              } else {
-                return content.toString().replace(new RegExp(urlDev, "g"), urlProd);
-              }
+              return dev ? content.toString().replaceAll(urlProd, urlDev) : content;
             },
           },
         ],
