@@ -37,10 +37,11 @@ jobs:
       - name: Validate production manifest
         run: npx office-addin-manifest validate dist/manifest.xml
 
+      # GitHub Pages must be enabled once in the repository settings
+      # (Settings > Pages > Source: GitHub Actions). The workflow token cannot
+      # create the Pages site itself, so `enablement` is not used here.
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
