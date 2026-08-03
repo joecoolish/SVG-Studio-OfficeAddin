@@ -1,0 +1,6 @@
+{
+  "extends": ["office-addins"],
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  }
+}
