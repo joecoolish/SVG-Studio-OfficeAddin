@@ -24,10 +24,35 @@ import { PreparedSvg, prepareSvg, recolorAllSvg, recolorSvg } from "../../svg/sv
 
 type SizeUnit = "in" | "px";
 type ReplacementMode = "preserve" | "reset";
+type PreviewBackground = "transparent" | "red-transparent" | "white" | "black" | "gray";
 
 const pixelsPerInch = 96;
 const recentColorsKey = "svg-studio-recent-colors";
 const sizeUnitKey = "svg-studio-size-unit";
+const transparentPattern =
+  "linear-gradient(45deg, #f3f3f3 25%, transparent 25%), linear-gradient(-45deg, #f3f3f3 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f3f3 75%), linear-gradient(-45deg, transparent 75%, #f3f3f3 75%)";
+const previewBackgroundStyles: Record<PreviewBackground, React.CSSProperties> = {
+  transparent: {
+    backgroundColor: "#ffffff",
+    backgroundImage: transparentPattern,
+  },
+  "red-transparent": {
+    backgroundColor: "rgba(255, 0, 0, 0.25)",
+    backgroundImage: "none",
+  },
+  white: {
+    backgroundColor: "#ffffff",
+    backgroundImage: "none",
+  },
+  black: {
+    backgroundColor: "#000000",
+    backgroundImage: "none",
+  },
+  gray: {
+    backgroundColor: "#808080",
+    backgroundImage: "none",
+  },
+};
 const defaultPalette = [
   "#000000",
   "#ffffff",
@@ -107,6 +132,12 @@ const useStyles = makeStyles({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  previewHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+  },
   preview: {
     display: "flex",
     alignItems: "center",
@@ -117,9 +148,6 @@ const useStyles = makeStyles({
     overflow: "hidden",
     borderRadius: tokens.borderRadiusLarge,
     ...shorthands.border("1px", "solid", tokens.colorNeutralStroke2),
-    backgroundColor: "#ffffff",
-    backgroundImage:
-      "linear-gradient(45deg, #f3f3f3 25%, transparent 25%), linear-gradient(-45deg, #f3f3f3 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f3f3 75%), linear-gradient(-45deg, transparent 75%, #f3f3f3 75%)",
     backgroundSize: "20px 20px",
     backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
     "& svg": {
@@ -247,6 +275,8 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
   const [width, setWidth] = React.useState(2);
   const [height, setHeight] = React.useState(2);
   const [sizeUnit, setSizeUnit] = React.useState<SizeUnit>(loadSizeUnit);
+  const [previewBackground, setPreviewBackground] =
+    React.useState<PreviewBackground>("transparent");
   const [widthInput, setWidthInput] = React.useState("2");
   const [heightInput, setHeightInput] = React.useState("2");
   const [lockAspect, setLockAspect] = React.useState(true);
@@ -649,8 +679,27 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
             </div>
           </div>
 
+          <div className={styles.previewHeader}>
+            <Text weight="semibold">Preview</Text>
+            <select
+              className={styles.unitSelect}
+              value={previewBackground}
+              aria-label="Preview background"
+              onChange={(event) =>
+                setPreviewBackground(event.target.value as PreviewBackground)
+              }
+            >
+              <option value="transparent">Transparent</option>
+              <option value="red-transparent">Red transparent</option>
+              <option value="white">White</option>
+              <option value="black">Black</option>
+              <option value="gray">Gray</option>
+            </select>
+          </div>
+
           <div
             className={styles.preview}
+            style={previewBackgroundStyles[previewBackground]}
             aria-label="SVG preview"
             dangerouslySetInnerHTML={{ __html: renderedMarkup }}
           />
