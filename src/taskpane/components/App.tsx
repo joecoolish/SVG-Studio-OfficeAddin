@@ -2,9 +2,15 @@ import * as React from "react";
 import {
   Button,
   Checkbox,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
+  SplitButton,
   Spinner,
   Text,
   makeStyles,
@@ -17,6 +23,7 @@ import { insertSvgIntoSlide } from "../../office/insertSvg";
 import { PreparedSvg, prepareSvg, recolorAllSvg, recolorSvg } from "../../svg/svgTools";
 
 type SizeUnit = "in" | "px";
+type ReplacementMode = "preserve" | "reset";
 
 const pixelsPerInch = 96;
 const recentColorsKey = "svg-studio-recent-colors";
@@ -85,6 +92,9 @@ const useStyles = makeStyles({
     display: "flex",
     gap: "6px",
     flexShrink: 0,
+  },
+  splitButton: {
+    minWidth: "88px",
   },
   dropActions: {
     display: "flex",
@@ -227,6 +237,7 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
   const styles = useStyles();
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const fileReplacementMode = React.useRef<ReplacementMode>("reset");
   const [svg, setSvg] = React.useState<PreparedSvg>();
   const [replacements, setReplacements] = React.useState<Record<string, string>>({});
   const [singleColor, setSingleColor] = React.useState(false);
@@ -258,39 +269,50 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
   }, [allColor, replacements, singleColor, svg]);
 
   const loadMarkup = React.useCallback(
-    (markup: string, name?: string) => {
+    (markup: string, name?: string, mode: ReplacementMode = "reset") => {
       try {
         const prepared = prepareSvg(extractSvgMarkup(markup), name);
         const initialWidth =
           prepared.aspectRatio >= 1 ? 2 : Math.max(0.25, 2 * prepared.aspectRatio);
         const initialHeight =
           prepared.aspectRatio >= 1 ? Math.max(0.25, 2 / prepared.aspectRatio) : 2;
+        const preserveSettings = mode === "preserve" && svg;
+        const currentColors = svg?.colors.map(
+          (color) => replacements[color.source] ?? color.value
+        );
         setSvg(prepared);
         setReplacements(
-          Object.fromEntries(prepared.colors.map((color) => [color.source, color.value]))
+          Object.fromEntries(
+            prepared.colors.map((color, index) => [
+              color.source,
+              preserveSettings ? (currentColors?.[index] ?? color.value) : color.value,
+            ])
+          )
         );
         setActiveColorSource(prepared.colors[0]?.source);
-        setWidth(roundSize(initialWidth));
-        setHeight(roundSize(initialHeight));
-        setWidthInput(String(fromInches(initialWidth, sizeUnit)));
-        setHeightInput(String(fromInches(initialHeight, sizeUnit)));
-        setSingleColor(false);
+        if (!preserveSettings) {
+          setWidth(roundSize(initialWidth));
+          setHeight(roundSize(initialHeight));
+          setWidthInput(String(fromInches(initialWidth, sizeUnit)));
+          setHeightInput(String(fromInches(initialHeight, sizeUnit)));
+          setSingleColor(false);
+        }
         setMessage(undefined);
       } catch (error) {
         setMessage({ intent: "error", text: (error as Error).message });
       }
     },
-    [sizeUnit]
+    [replacements, sizeUnit, svg]
   );
 
   const loadFile = React.useCallback(
-    async (file: File) => {
+    async (file: File, mode: ReplacementMode = "reset") => {
       if (!file.name.toLowerCase().endsWith(".svg") && file.type !== "image/svg+xml") {
         setMessage({ intent: "error", text: "Choose an .svg file." });
         return;
       }
       try {
-        loadMarkup(await file.text(), file.name);
+        loadMarkup(await file.text(), file.name, mode);
       } catch (error) {
         setMessage({
           intent: "error",
@@ -322,7 +344,7 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
     return () => window.removeEventListener("paste", handlePaste);
   }, [loadFile, loadMarkup]);
 
-  const readClipboard = async () => {
+  const readClipboard = async (mode: ReplacementMode = "reset") => {
     if (!navigator.clipboard) {
       setMessage({
         intent: "error",
@@ -343,7 +365,7 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
             }
             const markup = await (await item.getType(type)).text();
             if (markup.includes("<svg")) {
-              loadMarkup(markup, "Clipboard SVG.svg");
+              loadMarkup(markup, "Clipboard SVG.svg", mode);
               return;
             }
           }
@@ -351,7 +373,7 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
       } else {
         const markup = await navigator.clipboard.readText();
         if (markup.includes("<svg")) {
-          loadMarkup(markup, "Clipboard SVG.svg");
+          loadMarkup(markup, "Clipboard SVG.svg", mode);
           return;
         }
       }
@@ -516,6 +538,11 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
     }
   };
 
+  const chooseReplacementFile = (mode: ReplacementMode) => {
+    fileReplacementMode.current = mode;
+    inputRef.current?.click();
+  };
+
   return (
     <main className={styles.root}>
       <Header darkMode={darkMode} onToggleTheme={onToggleTheme} />
@@ -572,12 +599,53 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
               {svg.name}
             </Text>
             <div className={styles.fileActions}>
-              <Button size="small" disabled={readingClipboard} onClick={() => void readClipboard()}>
-                {readingClipboard ? <Spinner size="tiny" /> : "Clipboard"}
-              </Button>
-              <Button size="small" onClick={() => inputRef.current?.click()}>
-                Replace
-              </Button>
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      {...triggerProps}
+                      className={styles.splitButton}
+                      size="small"
+                      disabled={readingClipboard}
+                      primaryActionButton={{
+                        onClick: () => void readClipboard("preserve"),
+                      }}
+                      menuButton={{ "aria-label": "More clipboard replacement options" }}
+                    >
+                      {readingClipboard ? <Spinner size="tiny" /> : "Clipboard"}
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem onClick={() => void readClipboard("reset")}>
+                      Replace and reset to clipboard defaults
+                    </MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      {...triggerProps}
+                      className={styles.splitButton}
+                      size="small"
+                      primaryActionButton={{ onClick: () => chooseReplacementFile("preserve") }}
+                      menuButton={{ "aria-label": "More file replacement options" }}
+                    >
+                      File
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem onClick={() => chooseReplacementFile("reset")}>
+                      Replace and reset to file defaults
+                    </MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
             </div>
           </div>
 
@@ -743,8 +811,9 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) {
-            void loadFile(file);
+            void loadFile(file, svg ? fileReplacementMode.current : "reset");
           }
+          fileReplacementMode.current = "reset";
           event.target.value = "";
         }}
       />
@@ -793,9 +862,9 @@ function saveRecentColors(colors: string[]): void {
 
 function loadSizeUnit(): SizeUnit {
   try {
-    return localStorage.getItem(sizeUnitKey) === "px" ? "px" : "in";
+    return localStorage.getItem(sizeUnitKey) === "in" ? "in" : "px";
   } catch {
-    return "in";
+    return "px";
   }
 }
 
