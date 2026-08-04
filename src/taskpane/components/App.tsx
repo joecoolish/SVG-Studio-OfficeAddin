@@ -18,7 +18,10 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import Header from "./Header";
-import { getSelectedShapeColors } from "../../office/getSelectedShapeColors";
+import {
+  getSelectedShapeColors,
+  getSelectedShapeProperties,
+} from "../../office/getSelectedShapeColors";
 import { insertSvgIntoSlide } from "../../office/insertSvg";
 import { PreparedSvg, prepareSvg, recolorAllSvg, recolorSvg } from "../../svg/svgTools";
 
@@ -284,6 +287,7 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
   const [busy, setBusy] = React.useState(false);
   const [readingClipboard, setReadingClipboard] = React.useState(false);
   const [readingPowerPointColors, setReadingPowerPointColors] = React.useState(false);
+  const [readingSelectedProperties, setReadingSelectedProperties] = React.useState(false);
   const [message, setMessage] = React.useState<{ intent: "error" | "success"; text: string }>();
 
   const quickPalette = React.useMemo(
@@ -533,6 +537,51 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
     }
   };
 
+  const readSelectedProperties = async () => {
+    if (!svg) {
+      return;
+    }
+    setReadingSelectedProperties(true);
+    setMessage(undefined);
+    try {
+      const properties = await getSelectedShapeProperties();
+      setWidth(properties.widthInches);
+      setHeight(properties.heightInches);
+      setWidthInput(String(fromInches(properties.widthInches, sizeUnit)));
+      setHeightInput(String(fromInches(properties.heightInches, sizeUnit)));
+
+      const colors = properties.colors.map(normalizePaletteColor).filter(isColor);
+      if (colors.length === 1) {
+        setAllColor(colors[0]);
+        setSingleColor(true);
+        rememberColors(colors);
+      } else if (colors.length > 1) {
+        setReplacements(
+          Object.fromEntries(
+            svg.colors.map((color, index) => [
+              color.source,
+              colors[index] ?? replacements[color.source] ?? color.value,
+            ])
+          )
+        );
+        setSingleColor(false);
+        rememberColors(colors);
+      }
+
+      setMessage({
+        intent: "success",
+        text:
+          colors.length > 0
+            ? "Applied the selected shape's size and colors."
+            : "Applied the selected shape's size. It has no readable solid fill or line color.",
+      });
+    } catch (error) {
+      setMessage({ intent: "error", text: (error as Error).message });
+    } finally {
+      setReadingSelectedProperties(false);
+    }
+  };
+
   const handleInsert = async () => {
     if (!svg) {
       return;
@@ -633,14 +682,16 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
                 <MenuTrigger disableButtonEnhancement>
                   {(triggerProps) => (
                     <SplitButton
-                      {...triggerProps}
                       className={styles.splitButton}
                       size="small"
                       disabled={readingClipboard}
                       primaryActionButton={{
                         onClick: () => void readClipboard("preserve"),
                       }}
-                      menuButton={{ "aria-label": "More clipboard replacement options" }}
+                      menuButton={{
+                        ...triggerProps,
+                        "aria-label": "More clipboard replacement options",
+                      }}
                     >
                       {readingClipboard ? <Spinner size="tiny" /> : "Clipboard"}
                     </SplitButton>
@@ -658,11 +709,13 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
                 <MenuTrigger disableButtonEnhancement>
                   {(triggerProps) => (
                     <SplitButton
-                      {...triggerProps}
                       className={styles.splitButton}
                       size="small"
                       primaryActionButton={{ onClick: () => chooseReplacementFile("preserve") }}
-                      menuButton={{ "aria-label": "More file replacement options" }}
+                      menuButton={{
+                        ...triggerProps,
+                        "aria-label": "More file replacement options",
+                      }}
                     >
                       File
                     </SplitButton>
@@ -831,6 +884,16 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
               label="Lock aspect ratio"
               onChange={(_, data) => setLockAspect(Boolean(data.checked))}
             />
+            <Button
+              disabled={readingSelectedProperties}
+              onClick={() => void readSelectedProperties()}
+            >
+              {readingSelectedProperties ? (
+                <Spinner size="tiny" />
+              ) : (
+                "Read properties of selected image"
+              )}
+            </Button>
           </section>
 
           <div className={styles.actions}>
