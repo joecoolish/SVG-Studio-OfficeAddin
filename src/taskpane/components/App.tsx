@@ -8,6 +8,7 @@ import {
   MenuPopover,
   MenuTrigger,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
   SplitButton,
@@ -17,6 +18,7 @@ import {
   shorthands,
   tokens,
 } from "@fluentui/react-components";
+import { DismissRegular } from "@fluentui/react-icons";
 import Header from "./Header";
 import {
   getSelectedShapeColors,
@@ -75,8 +77,12 @@ const useStyles = makeStyles({
   root: {
     display: "flex",
     flexDirection: "column",
+    width: "100%",
+    maxWidth: "100vw",
+    minWidth: 0,
     minHeight: "100vh",
     boxSizing: "border-box",
+    overflowX: "hidden",
     padding: "12px",
     gap: "12px",
     backgroundColor: tokens.colorNeutralBackground1,
@@ -87,6 +93,9 @@ const useStyles = makeStyles({
     alignItems: "center",
     justifyContent: "center",
     minHeight: "150px",
+    minWidth: 0,
+    maxWidth: "100%",
+    boxSizing: "border-box",
     padding: "20px 12px",
     textAlign: "center",
     borderRadius: tokens.borderRadiusLarge,
@@ -104,6 +113,17 @@ const useStyles = makeStyles({
   },
   hiddenInput: {
     display: "none",
+  },
+  messageBar: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+  },
+  messageBody: {
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   },
   workspace: {
     display: "flex",
@@ -627,11 +647,21 @@ const App: React.FC<AppProps> = ({ darkMode, onToggleTheme }) => {
       <Header darkMode={darkMode} onToggleTheme={onToggleTheme} />
 
       {message && (
-        <MessageBar intent={message.intent}>
-          <MessageBarBody>
+        <MessageBar className={styles.messageBar} intent={message.intent}>
+          <MessageBarBody className={styles.messageBody}>
             <MessageBarTitle>{message.intent === "success" ? "Done" : "SVG error"}</MessageBarTitle>
             {message.text}
           </MessageBarBody>
+          <MessageBarActions
+            containerAction={
+              <Button
+                appearance="transparent"
+                icon={<DismissRegular />}
+                aria-label="Dismiss message"
+                onClick={() => setMessage(undefined)}
+              />
+            }
+          />
         </MessageBar>
       )}
 
